@@ -1,0 +1,6 @@
+# Ignore large and unnecessary files
+bin/
+downloads/
+node_modules/
+*.log
+.env
