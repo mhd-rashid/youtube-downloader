@@ -73,13 +73,11 @@ app.post("/download", async (req, res) => {
     const output = path.join(__dirname, "downloads", filename);
 
     // Make sure yt-dlp and ffmpeg are executable
-    const ffmpegPath = path.join(__dirname, "bin", process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg");
-    const ytDlpPath = path.join(__dirname, "bin", process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp");
+    const ffmpegPath = path.join(__dirname, "ffmpeg");
+    const ytDlpPath = path.join(__dirname, "yt-dlp");
 
-    if (process.platform !== "win32") {
-      fs.chmodSync(ffmpegPath, 0o755);
-      fs.chmodSync(ytDlpPath, 0o755);
-    }
+    fs.chmodSync(ffmpegPath, 0o755);
+    fs.chmodSync(ytDlpPath, 0o755);
 
     const ytdlp = spawn(ytDlpPath, [
       "-f", format,
