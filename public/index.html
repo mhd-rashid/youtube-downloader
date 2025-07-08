@@ -14,13 +14,14 @@
       <div class="col-md-6">
         <div class="card shadow-lg">
           <div class="card-body">
-            <h3 class="card-title text-center mb-4">📥 YouTube Video Downloader</h3>
+            <h3 class="card-title text-center mb-4">📥 YouTube Downloader</h3>
+
             <form id="downloadForm">
               <div class="mb-3">
                 <label for="url" class="form-label">YouTube URL</label>
-                <input type="text" name="url" id="url" class="form-control" placeholder="Paste YouTube video link here"
-                  required>
+                <input type="text" name="url" id="url" class="form-control" placeholder="Paste video link" required>
               </div>
+
               <div class="mb-3">
                 <label for="quality" class="form-label">Select Quality</label>
                 <select name="quality" id="quality" class="form-select" required>
@@ -32,23 +33,31 @@
                   <option value="bestaudio[ext=m4a]">Audio Only (M4A)</option>
                 </select>
               </div>
+
               <div class="d-grid">
                 <button type="submit" class="btn btn-danger">Download</button>
               </div>
             </form>
 
-            <!-- <div id="spinner" class="text-center mt-4 d-none">
+            <!-- Video info -->
+            <div id="videoInfo" class="mt-4 d-none">
+              <h5 class="text-center" id="videoTitle"></h5>
+              <div class="text-center">
+                <img id="videoThumbnail" src="" class="img-fluid rounded" style="max-height: 200px;">
+              </div>
+            </div>
+
+            <!-- Spinner while preparing -->
+            <div id="loadingSpinner" class="text-center mt-4 d-none">
               <div class="spinner-border text-danger" role="status">
                 <span class="visually-hidden">Loading...</span>
               </div>
-              <p class="mt-2">Downloading started...</p>
-            </div> -->
-            <div id="videoInfo" class="text-center d-none mt-3">
-              <img id="videoThumbnail" class="img-fluid rounded mb-2" style="max-height: 200px;" />
-              <h5 id="videoTitle" class="fw-semibold"></h5>
+              <p class="mt-2">Preparing your download...</p>
             </div>
+
+            <!-- Progress bar -->
             <div id="progressContainer" class="mt-4 d-none">
-              <label class="form-label">Download Progress</label>
+              <label class="form-label">Progress</label>
               <div class="progress">
                 <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
                   style="width: 0%;">0%</div>
@@ -56,7 +65,7 @@
             </div>
 
             <p class="mt-3 text-muted small text-center">
-              ⚠️ This tool is for personal and educational use only.
+              ⚠️ For personal & educational use only.
             </p>
           </div>
         </div>
@@ -66,103 +75,79 @@
 
   <script>
     const form = document.getElementById("downloadForm");
-    const spinner = document.getElementById("spinner");
+    const videoInfo = document.getElementById("videoInfo");
+    const videoTitle = document.getElementById("videoTitle");
+    const videoThumbnail = document.getElementById("videoThumbnail");
+    const loadingSpinner = document.getElementById("loadingSpinner");
     const progressContainer = document.getElementById("progressContainer");
     const progressBar = document.getElementById("progressBar");
 
     const socket = new WebSocket("ws://localhost:3000");
+    let alreadyDownloaded = false;
 
     socket.onmessage = (event) => {
       if (event.data.startsWith("done|")) {
-        const fileInfo = JSON.parse(event.data.split("|")[1]);
+        if (alreadyDownloaded) return;
+        alreadyDownloaded = true;
+
+        const info = JSON.parse(event.data.split("|")[1]);
 
         progressBar.style.width = "100%";
         progressBar.innerText = "Download Complete!";
         progressBar.classList.remove("progress-bar-animated");
 
-        // ✅ Show file name and size
-        const infoText = document.createElement("p");
-        infoText.className = "mt-2 text-success text-center fw-semibold";
-        infoText.innerText = `📁 ${fileInfo.fileName} (${fileInfo.fileSize})`;
-
-        // ✅ Create download button
-        const downloadBtn = document.createElement("a");
-        downloadBtn.href = fileInfo.filePath;
-        downloadBtn.className = "btn btn-success mt-2 w-100";
-        downloadBtn.innerText = "⬇️ Click to Download File";
-        downloadBtn.setAttribute("download", fileInfo.fileName);
-
-        // ✅ Append to progress container
-        progressContainer.appendChild(infoText);
-        progressContainer.appendChild(downloadBtn);
+        const link = document.createElement("a");
+        link.href = info.filePath;
+        link.download = info.fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       } else if (event.data === "error") {
+        loadingSpinner.classList.add("d-none");
         progressBar.classList.remove("progress-bar-animated");
         progressBar.classList.add("bg-danger");
-        progressBar.innerText = "❌ Download Failed";
+        progressBar.innerText = "❌ Failed";
       } else {
+        loadingSpinner.classList.add("d-none"); // hide spinner when progress starts
         progressContainer.classList.remove("d-none");
         progressBar.style.width = event.data + "%";
         progressBar.innerText = event.data + "%";
       }
     };
 
-
-    // Clean previous results
-    progressContainer.querySelectorAll("a.btn, p.text-success").forEach(el => el.remove());
-
     form.addEventListener("submit", async (e) => {
-      e.preventDefault(); // ✅ Stop page refresh
+      e.preventDefault();
 
-      // Clear previous download buttons if any
-      progressContainer.querySelectorAll("a.btn").forEach(btn => btn.remove());
-
-      // Reset progress bar
-      progressBar.style.width = "0%";
-      progressBar.innerText = "0%";
+      alreadyDownloaded = false;
+      videoInfo.classList.add("d-none");
+      progressContainer.classList.add("d-none");
+      progressBar.classList.remove("bg-danger");
       progressBar.classList.add("progress-bar-animated");
-      progressContainer.classList.remove("d-none");
+      progressBar.innerText = "0%";
+      progressBar.style.width = "0%";
+      loadingSpinner.classList.remove("d-none"); // show spinner
 
-      const formData = new FormData(form);
-      const url = formData.get("url");
+      const formData = new URLSearchParams(new FormData(form));
 
-      // 🔍 Fetch title & thumbnail
-      try {
-        const infoRes = await fetch("/info", {
-          method: "POST",
-          body: new URLSearchParams({ url }),
-        });
-        const info = await infoRes.json();
+      // Get title & thumbnail
+      const infoRes = await fetch("/info", {
+        method: "POST",
+        body: formData,
+      });
 
-        if (info.title && info.thumbnail) {
-          document.getElementById("videoThumbnail").src = info.thumbnail;
-          document.getElementById("videoTitle").innerText = info.title;
-          document.getElementById("videoInfo").classList.remove("d-none");
-        }
-      } catch (err) {
-        console.warn("Unable to fetch video info", err);
+      const infoData = await infoRes.json();
+      if (infoData.title) {
+        videoInfo.classList.remove("d-none");
+        videoTitle.innerText = infoData.title;
+        videoThumbnail.src = infoData.thumbnail;
       }
-      try {
-        const response = await fetch("/download", {
-          method: "POST",
-          body: new URLSearchParams(formData),
-        });
 
-        if (!response.ok) {
-          progressBar.classList.remove("progress-bar-animated");
-          progressBar.classList.add("bg-danger");
-          progressBar.innerText = "❌ Download failed!";
-        }
-
-        // No need to handle anything else here;
-        // WebSocket will push the result (`done|...`)
-      } catch (err) {
-        console.error("Fetch error:", err);
-        progressBar.classList.remove("progress-bar-animated");
-        progressBar.classList.add("bg-danger");
-        progressBar.innerText = "❌ Error occurred!";
-      }
+      // Start download
+      await fetch("/download", {
+        method: "POST",
+        body: formData,
+      });
     });
-
   </script>
 </body>
 
