@@ -4,7 +4,9 @@
   "description": "A YouTube video downloader with progress bar and auto-deletion, built in Node.js using yt-dlp and ffmpeg.",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "build": "npm install"
+
   },
   "dependencies": {
     "body-parser": "^1.20.2",
